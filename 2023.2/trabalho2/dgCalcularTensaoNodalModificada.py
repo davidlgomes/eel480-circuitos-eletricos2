@@ -1,10 +1,8 @@
 import numpy as np
 import sympy as sp
 import cmath
-def calcularTensaoNodalModificadaSimulacaoDC(listaComponentes, quantidadeNos, quantidadeFonteTensao, simulacao, frequencia, fase=0):
-    numElementos = len(listaComponentes)
-    matrizCondutancia = np.zeros((quantidadeNos+quantidadeFonteTensao+1, quantidadeNos+quantidadeFonteTensao+1), dtype=complex)
-    matrizCondutancia1 = np.zeros((quantidadeNos+quantidadeFonteTensao+1, quantidadeNos+quantidadeFonteTensao+1), dtype=complex)
+def calcularTensaoNodalModificada(listaComponentes, quantidadeNos, quantidadeFonteTensao, simulacao, frequencia, fase=0):
+    matrizCondutancia = np.zeros((quantidadeNos+quantidadeFonteTensao+1, quantidadeNos+quantidadeFonteTensao+1), dtype=complex) 
     vetorEntrada = np.zeros(quantidadeNos+quantidadeFonteTensao+1, dtype=complex)
     for indice, elemento in enumerate(listaComponentes):
         no1 = int(elemento[2]) 
@@ -78,18 +76,22 @@ def calcularTensaoNodalModificadaSimulacaoDC(listaComponentes, quantidadeNos, qu
             matrizCondutancia[ix, controlePositivo] -=1
             matrizCondutancia[ix, controleNegativo] +=1
         elif tipo == 'V':
+            ix=quantidadeNos+elemento[4]+1
             if elemento[5]==simulacao:
+                valor = elemento[6]  # Valor da fonte de tensão
                 if elemento[5]=='AC':
                     fase=(np.pi*elemento[7])/360  
                 else:
                     fase=0
-                ix=quantidadeNos+elemento[4]+1
-                valor = elemento[6] if elemento[5] == 'DC' else 0  # Valor da fonte de tensão
-                matrizCondutancia[no1, ix] += 1
-                matrizCondutancia[no2, ix] -= 1
-                matrizCondutancia[ix, no1] -= 1
-                matrizCondutancia[ix, no2] += 1
-                vetorEntrada[ix] -= cmath.rect(valor, fase)
+            else:
+                valor=0
+            matrizCondutancia[no1][ix] += 1
+            matrizCondutancia[no2][ix] -= 1
+            matrizCondutancia[ix][no1] -= 1
+            matrizCondutancia[ix][no2] += 1
+            vetorEntrada[ix] -= cmath.rect(valor, fase)
+            #print(matrizCondutancia)
+            
         elif tipo == 'I':
             if elemento[4] == simulacao:
                 fase=(elemento[6]*2*np.pi)/360
@@ -103,7 +105,7 @@ def calcularTensaoNodalModificadaSimulacaoDC(listaComponentes, quantidadeNos, qu
             indutanciaSecundaria=elemento[7]
             no3, no4 = elemento[4], elemento[5]
             n=np.sqrt(elemento[6]/elemento[7])
-            k=indutanciaMutua/np.sqrt(indutanciaPrimaria*indutanciaSecundaria)
+            k=elemento[9]
             if k==1:
                 ix=quantidadeNos+elemento[10]
                 matrizCondutancia[no1, ix] -= n
@@ -131,9 +133,10 @@ def calcularTensaoNodalModificadaSimulacaoDC(listaComponentes, quantidadeNos, qu
                 matrizCondutancia[iy][iy]+=1j*2*np.pi*frequencia*indutanciaSecundaria
         # Adicione condições para outros tipos de componentes (capacitores, indutores, fontes dependentes) se necessário
     # Resolva o sistema de equações lineares
-    #print(matrizCondutancia)
+    
     matrizCondutancia = np.delete(matrizCondutancia, 0, axis=0)
     matrizCondutancia = np.delete(matrizCondutancia, 0, axis=1)
+    #print(matrizCondutancia)
     vetorEntrada = np.delete(vetorEntrada, 0)
     tensaoNodal = np.linalg.solve(matrizCondutancia, vetorEntrada)
     return tensaoNodal
